@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Registro de Asistencia en Obra</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Marcación Obra">
+    
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+    .container { max-width: 400px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+    h2 { text-align: center; color: #333; }
+    label { display: block; margin-top: 10px; font-weight: bold; color: #555; }
+    input[type="text"], select { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { width: 100%; background-color: #007bff; color: white; padding: 12px 20px; margin-top: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #0056b3; }
+    #sendPendingButton { background-color: #ffc107; color: #333; }
+    #sendPendingButton:hover { background-color: #e0a800; }
+    #message { text-align: center; margin-top: 20px; font-weight: bold; }
+    .pending-badge { background-color: #ffc107; color: #333; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-left: 5px; }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 2s linear infinite; display: none; margin: 0 auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body onload="checkPendingData()">
+<div class="container">
+  <h2>Registro de Marcación</h2>
+  <form id="myForm">
+    <label for="nombre">Nombre y Apellido:</label>
+    <input type="text" id="nombre" name="nombre" required>
+
+    <label for="obra">Obra:</label>
+    <input type="text" id="obra" name="obra" required>
+
+    <label for="tipo">Tipo de Marcación:</label>
+    <select id="tipo" name="tipo" required>
+      <option value="Entrada">Entrada</option>
+      <option value="Salida">Salida</option>
+    </select>
+
+    <button type="button" onclick="handleFormSubmit()">
+      <span id="buttonText">Registrar Marcación</span>
+      <div id="loader" class="loader"></div>
+    </button>
+
+    <button type="button" id="sendPendingButton" style="display:none; margin-top: 10px;" onclick="sendPendingData(getPendingData())">
+      <span id="pendingButtonText">Enviar Marcaciones Pendientes</span>
+    </button>
+  </form>
+  <div id="message"></div>
+</div>
+
+<script>
+    // ESTE VALOR DEBE SER REEMPLAZADO EN EL PASO 7
+    const API_URL = 'REEMPLAZAR_CON_LA_URL_DE_TU_APPS_SCRIPT_API'; 
+    const PENDING_KEY = 'pendingMarcaciones';
+
+    // *** LÓGICA DE ENVÍO MODIFICADA PARA USAR 'FETCH' (conexión a la API) ***
+    async function sendData(payload) {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return response.json();
+    }
+    // *** FIN LÓGICA DE ENVÍO MODIFICADA ***
+
+    function checkPendingData() {
+        const pendingData = getPendingData();
+        const count = pendingData.length;
+        const messageDiv = document.getElementById('message');
+        const sendButton = document.getElementById('sendPendingButton');
+        const pendingButtonText = document.getElementById('pendingButtonText');
+
+        if (count > 0) {
+            messageDiv.innerHTML = `Tienes <span class="pending-badge">${count}</span> marcaciones pendientes.`;
+            sendButton.style.display = 'block'; 
+            pendingButtonText.textContent = `Enviar ${count} Marcaciones Pendientes`;
+        } else {
+            messageDiv.innerHTML = 'Listo para registrar.';
+            if (sendButton) {
+                sendButton.style.display = 'none'; 
+            }
+        }
+    }
+
+    function handleFormSubmit() {
+        const message = document.getElementById('message');
+        const buttonText = document.getElementById('buttonText');
+        const loader = document.getElementById('loader');
+        
+        buttonText.style.display = 'none';
+        loader.style.display = 'block';
+        message.innerHTML = 'Obteniendo ubicación...';
+
+        const nombre = document.getElementById('nombre').value.trim();
+        const obra = document.getElementById('obra').value.trim();
+        const tipo = document.getElementById('tipo').value;
+
+        if (!nombre || !obra) {
+            message.innerHTML = 'Por favor, complete todos los campos.';
+            resetButton();
+            return;
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const payload = {
+                        nombre: nombre,
+                        obra: obra,
+                        tipo: tipo,
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        accuracy: pos.coords.accuracy,
+                        deviceTimestamp: new Date(pos.timestamp || Date.now()).toISOString()
+                    };
+                    
+                    message.innerHTML = 'Intentando enviar datos...';
+                    
+                    try {
+                        const response = await sendData(payload);
+                        if (response.status === 'ok') {
+                            onSuccess();
+                        } else {
+                            onError(payload, response.message); 
+                        }
+                    } catch (error) {
+                        // Error de red (sin internet)
+                        onError(payload, error.toString()); 
+                    }
+                },
+                (error) => {
+                    message.innerHTML = `Error de ubicación (${error.code}): ${error.message}. No se puede registrar.`;
+                    resetButton();
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } 
+            );
+        } else {
+            message.innerHTML = 'Geolocalización no soportada por este navegador.';
+            resetButton();
+        }
+    }
+    
+    // --- Lógica de LocalStorage, Queue y Callbacks (sin cambios) ---
+    
+    function getPendingData() {
+        try {
+            return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+        } catch (e) {
+            console.error("Error al parsear datos pendientes:", e);
+            return [];
+        }
+    }
+
+    function savePendingData(data) {
+        localStorage.setItem(PENDING_KEY, JSON.stringify(data));
+    }
+
+    function removeFirstPending() {
+        const pending = getPendingData();
+        pending.shift();
+        savePendingData(pending);
+        checkPendingData();
+    }
+
+    function onSuccess(response) {
+        if (response && response.fromQueue) {
+            removeFirstPending();
+            document.getElementById('message').innerHTML = 'Marcación pendiente enviada. ✔';
+            const remaining = getPendingData();
+            if (remaining.length > 0) {
+                sendPendingData(remaining);
+            } else {
+                resetButton();
+            }
+            return;
+        }
+        
+        document.getElementById('message').innerHTML = '¡Registrado correctamente! ✔';
+        document.getElementById('myForm').reset();
+        resetButton();
+        checkPendingData(); 
+    }
+
+    function onError(payload, error) {
+        const pending = getPendingData();
+        pending.push(payload);
+        savePendingData(pending);
+
+        document.getElementById('message').innerHTML = `No hay conexión. Marcación guardada localmente. <span class="pending-badge">${pending.length}</span> pendientes.`;
+        document.getElementById('myForm').reset();
+        resetButton();
+        checkPendingData(); 
+    }
+    
+    async function sendPendingData(pendingData) {
+        const sendButton = document.getElementById('sendPendingButton');
+        const pendingButtonText = document.getElementById('pendingButtonText');
+        
+        if (pendingData.length === 0) {
+            checkPendingData();
+            return;
+        }
+
+        const nextPayload = pendingData[0];
+        
+        sendButton.disabled = true;
+        pendingButtonText.textContent = `Enviando 1 de ${pendingData.length}...`;
+
+        try {
+            const response = await sendData(nextPayload); // Usa la función de API
+            if (response.status === 'ok') {
+                onSuccess({ fromQueue: true }); 
+            } else {
+                // Falla en el servidor
+                document.getElementById('message').innerHTML = '<br>Error al enviar datos pendientes. El servidor falló. Intente de nuevo.';
+                sendButton.disabled = false;
+                checkPendingData();
+            }
+        } catch (e) {
+            // Falla de red (se vuelve a caer la conexión)
+            document.getElementById('message').innerHTML = '<br>Error al enviar datos pendientes. La conexión falló. Intente de nuevo.';
+            sendButton.disabled = false;
+            checkPendingData();
+        }
+    }
+    
+    function resetButton() {
+        const buttonText = document.getElementById('buttonText');
+        const loader = document.getElementById('loader');
+        
+        buttonText.style.display = 'inline';
+        loader.style.display = 'none';
+        
+        const sendButton = document.getElementById('sendPendingButton');
+        if (sendButton) {
+            sendButton.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
