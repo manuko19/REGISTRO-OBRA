@@ -55,8 +55,8 @@
 </div>
 
 <script>
-    // ESTE VALOR DEBE SER REEMPLAZADO EN EL PASO 7
-    "https://script.google.com/macros/s/AKfycbwKUIsPvNByfz8KUys3vEVX3DjumY_gsu_jKftYhA3AXOpyvoqy7rTC9H0uvc9oDV1T/exec"
+    // ** DEFINICIÓN GLOBAL DE API Y PENDING_KEY **
+    const API_URL = "https://script.google.com/macros/s/AKfycbwKUIsPvNByfz8KUys3vEVX3DjumY_gsu_jKftYhA3AXOpyvoqy7rTC9H0uvc9oDV1T/exec";
     const PENDING_KEY = 'pendingMarcaciones';
 
     // *** LÓGICA DE ENVÍO MODIFICADA PARA USAR 'FETCH' (conexión a la API) ***
@@ -65,8 +65,8 @@
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
-            const API_URL = "https://script.google.com/macros/s/AKfycbwKUIsPvNByfz8KUys3vEVX3DjumY_gsu_jKftYhA3AXOpyvoqy7rTC9H0uvc9oDV1T/exec";
-            const PENDING_KEY = 'pendingMarcaciones';
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
         return response.json();
     }
@@ -149,7 +149,7 @@
         }
     }
     
-    // --- Lógica de LocalStorage, Queue y Callbacks (sin cambios) ---
+    // --- Lógica de LocalStorage, Queue y Callbacks ---
     
     function getPendingData() {
         try {
@@ -246,7 +246,6 @@
         }
     }
 </script>
-</body>
-
 </html>
+
 
